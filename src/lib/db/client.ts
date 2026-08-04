@@ -14,3 +14,21 @@ sqlite.pragma("journal_mode = WAL");
 
 export const db = drizzle(sqlite, { schema });
 export { schema };
+
+/**
+ * Pour les tests: permet d'override la DB avec une instance en mémoire.
+ * Usage: setTestDb(myInMemoryDb) avant les tests, resetTestDb() après.
+ */
+let testDb: ReturnType<typeof drizzle> | null = null;
+
+export function setTestDb(testDbInstance: ReturnType<typeof drizzle>) {
+  testDb = testDbInstance;
+}
+
+export function resetTestDb() {
+  testDb = null;
+}
+
+export function getDb() {
+  return testDb ?? db;
+}
