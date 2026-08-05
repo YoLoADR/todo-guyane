@@ -40,5 +40,15 @@ export function getDb() {
   return initDb();
 }
 
+let testDb: ReturnType<typeof drizzle<typeof schema>> | null = null;
+
+export function setTestDb(instance: ReturnType<typeof drizzle<typeof schema>>) {
+  testDb = instance;
+}
+
+export function resetTestDb() {
+  testDb = null;
+}
+
 export const db = initDb();
 export { schema };
