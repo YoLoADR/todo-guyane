@@ -1,63 +1,59 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeAll, beforeEach } from "vitest";
 import { cleanup } from "@testing-library/react";
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "@/lib/db/schema";
 import { setTestDb, resetTestDb } from "@/lib/db/client";
 
-// ===== DB de test en mémoire =====
-let client: ReturnType<typeof createClient>;
+let sqlite: Database.Database;
+let testDb: ReturnType<typeof drizzle<typeof schema>>;
 
-beforeAll(() => {
-  // LibSQL in-memory: use :memory: with file: protocol
-});
+beforeAll(() => {});
 
-beforeEach(async () => {
-  client = createClient({ url: ":memory:" });
-  await client.executeMultiple(`
+beforeEach(() => {
+  sqlite = new Database(":memory:");
+  sqlite.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       description TEXT,
-      priority TEXT NOT NULL CHECK(priority IN ('low','medium','high','urgent')),
+      priority TEXT NOT NULL,
       category TEXT,
       due_date TEXT,
-      status TEXT NOT NULL CHECK(status IN ('backlog','todo','in_progress','done')),
+      status TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
-  const testDb = drizzle(client, { schema });
+  testDb = drizzle(sqlite, { schema });
   setTestDb(testDb);
 });
 
 afterEach(() => {
   cleanup();
-  if (client) client.close();
+  if (sqlite) sqlite.close();
   resetTestDb();
 });
 
-/** Insère une tâche directement en SQL (pour les tests). */
-export async function insertTask(overrides: Partial<schema.Task> = {}): Promise<schema.Task> {
-  const result = await client.execute({
-    sql: `INSERT INTO tasks (title, description, priority, category, due_date, status)
-          VALUES (?, ?, ?, ?, ?, ?)
-          RETURNING *`,
-    args: [
-      overrides.title ?? "Test task",
-      overrides.description ?? null,
-      overrides.priority ?? "medium",
-      overrides.category ?? null,
-      overrides.dueDate ?? null,
-      overrides.status ?? "todo",
-    ],
-  });
-  return result.rows[0] as unknown as schema.Task;
+export function insertTask(overrides: Partial<schema.Task> = {}): schema.Task {
+  const stmt = sqlite.prepare(
+    `INSERT INTO tasks (title, description, priority, category, due_date, status)
+     VALUES (?, ?, ?, ?, ?, ?)
+     RETURNING *`
+  );
+  const row = stmt.get(
+    overrides.title ?? "Test task",
+    overrides.description ?? null,
+    overrides.priority ?? "medium",
+    overrides.category ?? null,
+    overrides.dueDate ?? null,
+    overrides.status ?? "todo",
+  ) as schema.Task;
+  return row;
 }
 
-/** Récupère toutes les tâches (pour les tests). */
-export async function getAllTasks(): Promise<schema.Task[]> {
-  const result = await client.execute("SELECT * FROM tasks");
-  return result.rows as unknown as schema.Task[];
+export function getAllTasks(): schema.Task[] {
+  const rows = sqlite.prepare("SELECT * FROM tasks").all() as schema.Task[];
+  return rows;
 }
