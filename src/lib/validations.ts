@@ -13,6 +13,7 @@ export const createTaskSchema = z
     priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
     category: z.string().max(50).optional(),
     dueDate: z.string().datetime().optional(),
+    status: z.enum(["backlog", "todo", "in_progress", "done"]).default("todo"),
   })
   .refine(
     (data) => {
