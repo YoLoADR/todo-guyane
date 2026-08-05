@@ -26,7 +26,7 @@ function ensureDirExists(filePath: string): void {
 
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-function getDb() {
+function initDb() {
   if (dbInstance) return dbInstance;
   ensureDirExists(DB_PATH);
   const sqlite = new Database(DB_PATH);
@@ -36,5 +36,9 @@ function getDb() {
   return dbInstance;
 }
 
-export const db = getDb();
+export function getDb() {
+  return initDb();
+}
+
+export const db = initDb();
 export { schema };
