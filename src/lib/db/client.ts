@@ -1,34 +1,40 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import * as schema from "./schema";
+import { createClient } from @libsql/client;
+import { drizzle } from drizzle-orm/libsql;
+import { existsSync, mkdirSync } from node:fs;
+import { dirname, resolve } from node:path;
+import * as schema from ./schema;
 
-/**
- * Crée un client LibSQL pointant vers Turso (production) ou un fichier local (dev).
- * En prod (Netlify), les env vars TURSO_DATABASE_URL et TURSO_AUTH_TOKEN sont obligatoires.
- * En dev local, on utilise un fichier SQLite local via libsql://file:.
- */
-function createDbClient() {
-  const url = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN;
+const IS_SERVERLESS = !!(
+  process.env.NETLIFY ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.cwd() === /var/task
+);
 
-  if (url && authToken) {
-    // Production: Turso remote database
-    return createClient({ url, authToken });
+const DB_PATH = process.env.DB_PATH ?? (
+  IS_SERVERLESS
+    ? /tmp/todo.db
+    : resolve(process.cwd(), data/todo.db)
+);
+
+function ensureDirExists(filePath: string): void {
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
   }
-
-  // Développement local: fichier SQLite
-  const localPath = process.env.LOCAL_DB_PATH ?? "./data/todo.db";
-  return createClient({ url: `file:${localPath}` });
 }
 
-const client = createDbClient();
-export const db = drizzle(client, { schema });
+let client: ReturnType<typeof createClient> | null = null;
+
+function getClient() {
+  if (client) return client;
+  ensureDirExists(DB_PATH);
+  client = createClient({ url: `file:${DB_PATH}` });
+  return client;
+}
+
+export const db = drizzle(getClient(), { schema });
 export { schema };
 
-/**
- * Pour les tests: permet d'override la DB avec une instance en mémoire.
- * Usage: setTestDb(myInMemoryDb) avant les tests, resetTestDb() après.
- */
 let testDb: ReturnType<typeof drizzle> | null = null;
 
 export function setTestDb(testDbInstance: ReturnType<typeof drizzle>) {
